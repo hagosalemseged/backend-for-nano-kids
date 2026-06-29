@@ -1,19 +1,22 @@
-# app/core/security.py
-
-from passlib.context import CryptContext
 from datetime import datetime, timedelta, timezone
 from jose import jwt, JWTError
+import bcrypt  # Replaced passlib with native bcrypt
 from app.core.config import settings
-
-pwd_context = CryptContext(schemes=["bcrypt"],deprecated="auto")
 
 # to make password hashed
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    # Convert string to bytes, hash it, then decode back to a string
+    pwd_bytes = password.encode('utf-8')
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(pwd_bytes, salt).decode('utf-8')
 
 # to verify password
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    # Check the plain password bytes against the stored hash bytes
+    return bcrypt.checkpw(
+        plain_password.encode('utf-8'), 
+        hashed_password.encode('utf-8')
+    )
 
 # To generate Jwt token
 def create_access_token(
@@ -36,4 +39,3 @@ def create_access_token(
         settings.SECRET_KEY,
         algorithm=settings.ALGORITHM
     )
-
