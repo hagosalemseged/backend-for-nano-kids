@@ -9,6 +9,7 @@ from app.model.users import User
 from sqlalchemy import func
 from app.model.unit import Unit
 from app.core.storage import storage_service
+from typing import List
 
 router = APIRouter(prefix="/subjects", tags=["Subjects"])
 
@@ -137,3 +138,12 @@ def delete_subject(
     return {
         "detail": "Subject deleted successfully"
     }
+
+# Endpoint to get all subjects without pagination (used as a foreign key selector, e.g. Unit page)
+@router.get("/all", response_model=List[SubjectResponseSchema])
+def get_all_subjects(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    subjects = db.query(Subject).order_by(Subject.name.asc()).all()
+    return subjects

@@ -9,6 +9,7 @@ from app.model.users import User
 from sqlalchemy import func
 from app.model.student_profile import StudentProfile
 from app.model.unit import Unit
+from typing import List
 
 router = APIRouter(prefix="/grades", tags=["Grades"])
 
@@ -132,3 +133,15 @@ def delete_grade(
     return {
         "detail": "Grade deleted successfully"
     }
+
+# Endpoint for getting all grades without pagination (for dropdowns, etc.)
+from typing import List
+
+# Endpoint to get all grades without pagination (used as a foreign key selector, e.g. Unit page)
+@router.get("/all", response_model=List[GradeResponseSchema])
+def get_all_grades(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    grades = db.query(Grade).order_by(Grade.name.asc()).all()
+    return grades

@@ -8,6 +8,7 @@ from app.core.dependencies import get_current_user, require_admin
 from app.model.users import User
 from sqlalchemy import func
 from app.model.unit_lesson import LessonTranslation
+from typing import List
 
 router = APIRouter(prefix="/languages", tags=["Languages"])
 
@@ -126,3 +127,12 @@ def delete_language(
     return {
         "detail": "Language deleted successfully"
     }
+
+# Endpoint to get all languages without pagination (used as a foreign key selector, e.g. Lesson Translation page)
+@router.get("/all", response_model=List[LanguageResponseSchema])
+def get_all_languages(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    languages = db.query(Language).order_by(Language.name.asc()).all()
+    return languages

@@ -11,6 +11,7 @@ from app.model.grade import Grade
 from app.model.subject import Subject
 from app.model.unit_lesson import LessonTranslation
 from app.core.storage import storage_service
+from typing import List, Optional
 
 router = APIRouter(prefix="/units", tags=["Units"])
 
@@ -185,3 +186,21 @@ def delete_unit(
     return {
         "detail": "Unit deleted successfully"
     }
+
+# Endpoint to get all units without pagination (used as a foreign key selector, e.g. Lesson page)
+@router.get("/all", response_model=List[UnitResponseSchema])
+def get_all_units(
+    grade_id: Optional[int] = None,
+    subject_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    query = db.query(Unit)
+
+    if grade_id is not None:
+        query = query.filter(Unit.grade_id == grade_id)
+    if subject_id is not None:
+        query = query.filter(Unit.subject_id == subject_id)
+
+    units = query.order_by(Unit.sort_order.asc(), Unit.title.asc()).all()
+    return units
