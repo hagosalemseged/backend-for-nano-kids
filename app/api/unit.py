@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.model.unit import Unit
@@ -10,18 +10,25 @@ from sqlalchemy import func,desc
 from app.model.grade import Grade
 from app.model.subject import Subject
 from app.model.unit_lesson import LessonTranslation
+from app.core.storage import storage_service
 
 router = APIRouter(prefix="/units", tags=["Units"])
 
 # Endpoint to create a new unit (admin only)
 @router.post("/add", response_model=UnitResponseSchema, status_code=status.HTTP_201_CREATED)
-def create_unit(
-    payload: UnitCreateSchema,
+async def create_unit(
+    grade_id: int = Form(...),
+    subject_id: int = Form(...),
+    title: str = Form(...),
+    sort_order: int = Form(default=1),
+    thumbnail: str | None = Form(default=None),
+    is_published: bool = Form(default=False),
+    file: UploadFile | None = File(default=None),
     db: Session = Depends(get_db),
-     _: User = Depends(require_admin)):
+    _: User = Depends(require_admin)):
     
      # Check grade exists
-    grade = db.get(Grade, payload.grade_id)
+    grade = db.get(Grade, grade_id)
 
     if not grade:
         raise HTTPException(
@@ -30,7 +37,7 @@ def create_unit(
         )
 
     # Check subject exists
-    subject = db.get(Subject, payload.subject_id)
+    subject = db.get(Subject, subject_id)
 
     if not subject:
         raise HTTPException(
@@ -42,9 +49,9 @@ def create_unit(
     existing_unit = (
         db.query(Unit)
         .filter(
-            Unit.grade_id == payload.grade_id,
-            Unit.subject_id == payload.subject_id,
-            Unit.title.ilike(payload.title.strip())
+            Unit.grade_id == grade_id,
+            Unit.subject_id == subject_id,
+            Unit.title.ilike(title.strip())
         )
         .first()
     )
@@ -55,13 +62,17 @@ def create_unit(
             detail="Unit already exists for this grade and subject"
         )
 
+    image_url = thumbnail if thumbnail else None
+    if file is not None:
+        image_url = await storage_service.upload_image(file, "units")
+
     unit = Unit(
-        grade_id=payload.grade_id,
-        subject_id=payload.subject_id,
-        title=payload.title.strip(),
-        sort_order=payload.sort_order,
-        thumbnail=payload.thumbnail if payload.thumbnail else None,
-        is_published=payload.is_published
+        grade_id=grade_id,
+        subject_id=subject_id,
+        title=title.strip(),
+        sort_order=sort_order,
+        thumbnail=image_url,
+        is_published=is_published
     )
 
     db.add(unit)
@@ -72,9 +83,11 @@ def create_unit(
 
 # Endpoint to update unit by admin only
 @router.put("/update/{unit_id}", response_model=UnitResponseSchema)
-def update_unit(
+async def update_unit(
     unit_id: int,
-    payload: UnitUpdateSchema,
+    title: str = Form(...),
+    thumbnail: str | None = Form(default=None),
+    file: UploadFile | None = File(default=None),
     db: Session = Depends(get_db),
     current_user=Depends(require_admin)
 ):
@@ -93,7 +106,7 @@ def update_unit(
             Unit.id != unit_id,
             Unit.grade_id == unit.grade_id,
             Unit.subject_id == unit.subject_id,
-            Unit.title.ilike(payload.title.strip())
+            Unit.title.ilike(title.strip())
         )
         .first()
     )
@@ -104,8 +117,11 @@ def update_unit(
             detail="Unit title already exists for this grade and subject"
         )
 
-    unit.title = payload.title.strip()
-    unit.thumbnail = payload.thumbnail
+    unit.title = title.strip()
+    if file is not None:
+        unit.thumbnail = await storage_service.upload_image(file, "units")
+    elif thumbnail is not None:
+        unit.thumbnail = thumbnail
 
     db.commit()
     db.refresh(unit)

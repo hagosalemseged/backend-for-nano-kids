@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.model.subject import Subject
@@ -8,20 +8,27 @@ from app.core.dependencies import get_current_user, require_admin
 from app.model.users import User
 from sqlalchemy import func
 from app.model.unit import Unit
+from app.core.storage import storage_service
 
 router = APIRouter(prefix="/subjects", tags=["Subjects"])
 
 # Endpoint to create a new subject (admin only)
 @router.post("/add", response_model=SubjectResponseSchema, status_code=status.HTTP_201_CREATED)
-def create_subject(
-    payload: SubjectCreateSchema,
+async def create_subject(
+    name: str = Form(...),
+    thumbnail: str | None = Form(default=None),
+    file: UploadFile | None = File(default=None),
     db: Session = Depends(get_db),
-     _: User = Depends(require_admin)):
-    existing_subject = db.query(Subject).filter(Subject.name == payload.name.strip()).first()
+    _: User = Depends(require_admin)):
+    existing_subject = db.query(Subject).filter(Subject.name == name.strip()).first()
     if existing_subject:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Subject with this name already exists")
 
-    subject = Subject(name=payload.name, thumbnail=payload.thumbnail if payload.thumbnail else None)
+    image_url = thumbnail if thumbnail else None
+    if file is not None:
+        image_url = await storage_service.upload_image(file, "subjects")
+
+    subject = Subject(name=name, thumbnail=image_url)
     db.add(subject)
     db.commit()
     db.refresh(subject)
@@ -29,9 +36,11 @@ def create_subject(
 
 # Endpoint to update subject by admin only
 @router.put("/update/{subject_id}", response_model=SubjectResponseSchema)
-def update_subject(
+async def update_subject(
     subject_id: int,
-    payload: SubjectCreateSchema,
+    name: str = Form(...),
+    thumbnail: str | None = Form(default=None),
+    file: UploadFile | None = File(default=None),
     db: Session = Depends(get_db),
     current_user=Depends(require_admin)
 ):
@@ -43,8 +52,10 @@ def update_subject(
             detail="Subject not found"
         )
 
-    new_name = payload.name.strip()
-    new_thumbnail = payload.thumbnail.strip() if payload.thumbnail else None
+    new_name = name.strip()
+    new_thumbnail = thumbnail if thumbnail else None
+    if file is not None:
+        new_thumbnail = await storage_service.upload_image(file, "subjects")
 
     # Check for duplicate subject name excluding current subject
     existing_subject = (
