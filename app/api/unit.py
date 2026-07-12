@@ -133,15 +133,23 @@ async def update_unit(
 @router.get("/getAll")
 def get_units(
     pagination: PaginationSchema = Depends(),
+    grade_id: Optional[int] = None,
+    subject_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
     skip = (pagination.page - 1) * pagination.size
 
-    total = db.query(func.count(Unit.id)).scalar()
+    query = db.query(Unit)
+    if grade_id is not None:
+        query = query.filter(Unit.grade_id == grade_id)
+    if subject_id is not None:
+        query = query.filter(Unit.subject_id == subject_id)
+
+    total = query.with_entities(func.count(Unit.id)).scalar()
 
     units = (
-        db.query(Unit)
+        query
         .order_by(desc(Unit.id))
         .offset(skip)
         .limit(pagination.size)
