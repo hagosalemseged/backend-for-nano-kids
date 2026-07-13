@@ -8,5 +8,5 @@ venv/
 .venv/
 *.sqlite3
 *.log
-.alembic/
-.alembic.ini
+alembic/
+alembic.ini
