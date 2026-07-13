@@ -3,6 +3,8 @@ from pydantic import BaseModel, Field
 
 class LessonTranslationCreateSchema(BaseModel):
     unit_id: int
+    grade_id: int
+    subject_id: int
     language_id: int
     title: str = Field(..., min_length=2, max_length=255)
     content: str = Field(..., min_length=1)
@@ -22,6 +24,8 @@ class LessonTranslationUpdateSchema(BaseModel):
 class LessonTranslationResponseSchema(BaseModel):
     id: int
     unit_id: int
+    grade_id: int
+    subject_id: int
     language_id: int
     title: str
     content: str

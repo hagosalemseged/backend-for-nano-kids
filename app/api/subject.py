@@ -166,8 +166,13 @@ def delete_subject(
 # Endpoint to get all subjects without pagination (used as a foreign key selector, e.g. Unit page)
 @router.get("/all", response_model=List[SubjectResponseSchema])
 def get_all_subjects(
+    grade_id: int | None = None,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
-    subjects = db.query(Subject).order_by(Subject.name.asc()).all()
+    query = db.query(Subject)
+    if grade_id is not None:
+        query = query.filter(Subject.grade_id == grade_id)
+
+    subjects = query.order_by(Subject.name.asc()).all()
     return subjects

@@ -8,7 +8,7 @@ class SubjectCreateSchema(BaseModel):
 class SubjectResponseSchema(BaseModel):
     id: int
     name: str
-    grade_id: int
+    grade_id: int | None
     thumbnail: str | None
 
     model_config = {

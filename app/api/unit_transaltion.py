@@ -6,8 +6,9 @@ from app.schema.unit_translation import LessonTranslationCreateSchema, LessonTra
 from app.schema.pagination import PaginationSchema
 from app.core.dependencies import get_current_user, require_admin
 from app.model.users import User
+from app.model.grade import Grade
+from app.model.subject import Subject
 from sqlalchemy import func,desc
-from app.model.student_progress import StudentProgress
 from app.model.unit import Unit
 from app.model.language import Language
 from app.model.unit_lesson import LessonTranslation
@@ -19,6 +20,8 @@ router = APIRouter(prefix="/unitsTranslation", tags=["Units Translation"])
 @router.post("/add", response_model=LessonTranslationResponseSchema, status_code=status.HTTP_201_CREATED)
 async def create_lesson_translation(
     unit_id: int = Form(...),
+    grade_id: int = Form(...),
+    subject_id: int = Form(...),
     language_id: int = Form(...),
     title: str = Form(...),
     content: str = Form(...),
@@ -39,6 +42,20 @@ async def create_lesson_translation(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Unit not found"
+        )
+    # check grade exists
+    grade = db.get(Grade, grade_id)
+    if not grade:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Grade not found"
+        )
+    # check subject exists
+    subject = db.get(Subject, subject_id)   
+    if not subject:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Subject not found"
         )
 
     # Check Language exists
@@ -82,6 +99,8 @@ async def create_lesson_translation(
 
         lesson_translation = LessonTranslation(
             unit_id=unit_id,
+            grade_id=grade_id,
+            subject_id=subject_id,
             language_id=language_id,
             title=title.strip(),
             content=content.strip(),

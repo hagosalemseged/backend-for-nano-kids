@@ -10,6 +10,8 @@ class LessonTranslation(Base):
     __tablename__ = "lesson_translations"
 
     id: Mapped[int] = mapped_column(primary_key=True,autoincrement=True)
+    grade_id: Mapped[int] = mapped_column(ForeignKey("grades.id"),nullable=True)
+    subject_id: Mapped[int] = mapped_column(ForeignKey("subjects.id"),nullable=True)
     unit_id: Mapped[int] = mapped_column(ForeignKey("units.id"))
     language_id: Mapped[int] = mapped_column(ForeignKey("languages.id"))
     title: Mapped[str] = mapped_column(String(255),nullable=False)
