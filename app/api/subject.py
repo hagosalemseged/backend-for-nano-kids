@@ -8,6 +8,7 @@ from app.core.dependencies import get_current_user, require_admin
 from app.model.users import User
 from sqlalchemy import func
 from app.model.unit import Unit
+from app.model.grade import Grade
 from app.core.storage import storage_service
 from typing import List
 
@@ -17,10 +18,16 @@ router = APIRouter(prefix="/subjects", tags=["Subjects"])
 @router.post("/add", response_model=SubjectResponseSchema, status_code=status.HTTP_201_CREATED)
 async def create_subject(
     name: str = Form(...),
+    grade_id: int = Form(...),
     thumbnail: str | None = Form(default=None),
     file: UploadFile | None = File(default=None),
     db: Session = Depends(get_db),
     _: User = Depends(require_admin)):
+
+    grade = db.get(Grade, grade_id)
+    if not grade:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Grade not found")
+
     existing_subject = db.query(Subject).filter(Subject.name == name.strip()).first()
     if existing_subject:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Subject with this name already exists")
@@ -29,7 +36,7 @@ async def create_subject(
     if file is not None:
         image_url = await storage_service.upload_image(file, "subjects")
 
-    subject = Subject(name=name, thumbnail=image_url)
+    subject = Subject(name=name, thumbnail=image_url, grade_id=grade_id)
     db.add(subject)
     db.commit()
     db.refresh(subject)
@@ -40,6 +47,7 @@ async def create_subject(
 async def update_subject(
     subject_id: int,
     name: str = Form(...),
+    grade_id: int = Form(...),
     thumbnail: str | None = Form(default=None),
     file: UploadFile | None = File(default=None),
     db: Session = Depends(get_db),
@@ -52,6 +60,10 @@ async def update_subject(
             status_code=404,
             detail="Subject not found"
         )
+
+    grade = db.get(Grade, grade_id)
+    if not grade:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Grade not found")
 
     new_name = name.strip()
     new_thumbnail = thumbnail if thumbnail else None
@@ -76,6 +88,7 @@ async def update_subject(
 
     subject.name = new_name
     subject.thumbnail = new_thumbnail
+    subject.grade_id = grade_id
 
     db.commit()
     db.refresh(subject)
@@ -85,16 +98,21 @@ async def update_subject(
 # Endpoint to get all subjects with pagination
 @router.get("/getAll")
 def get_subjects(
+    grade_id: int | None = None,
     pagination: PaginationSchema = Depends(),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
     skip = (pagination.page - 1) * pagination.size
 
-    total = db.query(func.count(Subject.id)).scalar()
+    query = db.query(Subject)
+    if grade_id is not None:
+        query = query.filter(Subject.grade_id == grade_id)
+
+    total = query.with_entities(func.count(Subject.id)).scalar()
 
     subjects = (
-        db.query(Subject)
+        query
         .offset(skip)
         .limit(pagination.size)
         .all()
