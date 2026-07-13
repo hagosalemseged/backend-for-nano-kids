@@ -22,6 +22,7 @@ async def create_lesson_translation(
     language_id: int = Form(...),
     title: str = Form(...),
     content: str = Form(...),
+    access_type: str = Form(default="FREE"),
     image_url: str | None = Form(default=None),
     audio_url: str | None = Form(default=None),
     video_url: str | None = Form(default=None),
@@ -84,6 +85,7 @@ async def create_lesson_translation(
             language_id=language_id,
             title=title.strip(),
             content=content.strip(),
+            access_type=access_type,
             image_url=uploaded_image_url,
             audio_url=uploaded_audio_url,
             video_url=uploaded_video_url
@@ -111,6 +113,7 @@ async def update_lesson_translation(
     lesson_translation_id: int,
     title: str | None = Form(default=None),
     content: str | None = Form(default=None),
+    access_type: str | None = Form(default=None),
     image_url: str | None = Form(default=None),
     audio_url: str | None = Form(default=None),
     video_url: str | None = Form(default=None),
@@ -152,6 +155,8 @@ async def update_lesson_translation(
             lesson_translation.title = title.strip()
         if content is not None:
             lesson_translation.content = content.strip()
+        if access_type is not None:
+            lesson_translation.access_type = access_type
         if file is not None and getattr(file, "filename", None):
             lesson_translation.image_url = await storage_service.upload_image(file, "unit-translations/images")
         elif image_url is not None:
