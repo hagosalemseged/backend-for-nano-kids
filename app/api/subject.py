@@ -66,9 +66,15 @@ async def update_subject(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Grade not found")
 
     new_name = name.strip()
-    new_thumbnail = thumbnail if thumbnail else None
+
+    # Only touch the thumbnail if a new file was uploaded or an explicit
+    # thumbnail URL was passed in. Otherwise, keep the existing one.
     if file is not None:
         new_thumbnail = await storage_service.upload_image(file, "subjects")
+    elif thumbnail is not None:
+        new_thumbnail = thumbnail
+    else:
+        new_thumbnail = subject.thumbnail
 
     # Check for duplicate subject name excluding current subject
     existing_subject = (
