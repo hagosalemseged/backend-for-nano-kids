@@ -20,8 +20,6 @@ router = APIRouter(prefix="/unitsTranslation", tags=["Units Translation"])
 @router.post("/add", response_model=LessonTranslationResponseSchema, status_code=status.HTTP_201_CREATED)
 async def create_lesson_translation(
     unit_id: int = Form(...),
-    grade_id: int = Form(...),
-    subject_id: int = Form(...),
     language_id: int = Form(...),
     title: str = Form(...),
     content: str = Form(...),
@@ -42,20 +40,6 @@ async def create_lesson_translation(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Unit not found"
-        )
-    # check grade exists
-    grade = db.get(Grade, grade_id)
-    if not grade:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Grade not found"
-        )
-    # check subject exists
-    subject = db.get(Subject, subject_id)   
-    if not subject:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Subject not found"
         )
 
     # Check Language exists
@@ -99,8 +83,6 @@ async def create_lesson_translation(
 
         lesson_translation = LessonTranslation(
             unit_id=unit_id,
-            grade_id=grade_id,
-            subject_id=subject_id,
             language_id=language_id,
             title=title.strip(),
             content=content.strip(),
@@ -209,16 +191,25 @@ async def update_lesson_translation(
 # Endpoint to get all units translation with pagination
 @router.get("/getAll")
 def get_units_translations(
+    unit_id: int | None = None,
+    language_id: int | None = None,
     pagination: PaginationSchema = Depends(),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
     skip = (pagination.page - 1) * pagination.size
 
-    total = db.query(func.count(LessonTranslation.id)).scalar()
+    query = db.query(LessonTranslation)
+
+    if unit_id is not None:
+        query = query.filter(LessonTranslation.unit_id == unit_id)
+    if language_id is not None:
+        query = query.filter(LessonTranslation.language_id == language_id)
+
+    total = query.with_entities(func.count(LessonTranslation.id)).scalar()
 
     unit_translations = (
-        db.query(LessonTranslation)
+        query
         .order_by(desc(LessonTranslation.id))
         .offset(skip)
         .limit(pagination.size)
