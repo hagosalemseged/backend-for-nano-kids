@@ -64,6 +64,9 @@ async def update_subject(
     subject_id: int,
     name: str = Form(...),
     grade_id: int = Form(...),
+    language_id: int = Form(...),
+    order_number: int | None = Form(default=None),
+    badge: str | None = Form(default=None),
     thumbnail: str | None = Form(default=None),
     file: UploadFile | None = File(default=None),
     db: Session = Depends(get_db),
@@ -82,6 +85,10 @@ async def update_subject(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Grade not found")
 
     new_name = name.strip()
+    new_grade_id = grade_id
+    new_language_id = language_id
+    new_order_number = order_number
+    new_badge = badge
 
     # Only touch the thumbnail if a new file was uploaded or an explicit
     # thumbnail URL was passed in. Otherwise, keep the existing one.
@@ -110,7 +117,10 @@ async def update_subject(
 
     subject.name = new_name
     subject.thumbnail = new_thumbnail
-    subject.grade_id = grade_id
+    subject.grade_id = new_grade_id
+    subject.language_id = new_language_id
+    subject.order_number = new_order_number
+    subject.badge = new_badge
 
     db.commit()
     db.refresh(subject)

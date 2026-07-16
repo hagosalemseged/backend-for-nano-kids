@@ -58,6 +58,9 @@ def update_grade(
         )
 
     new_name = payload.name.strip()
+    new_language_id = payload.language_id
+    new_badge = payload.badge
+    new_order_number = payload.order_number
 
     # Check for duplicate grade name excluding current grade
     existing_grade = (
@@ -76,6 +79,9 @@ def update_grade(
         )
 
     grade.name = new_name
+    grade.language_id = new_language_id
+    grade.badge = new_badge
+    grade.order_number = new_order_number
 
     db.commit()
     db.refresh(grade)
