@@ -9,7 +9,8 @@ from app.model.users import User
 from sqlalchemy import func
 from app.model.student_profile import StudentProfile
 from app.model.unit import Unit
-from typing import List
+from app.model.language import Language
+from typing import List, Optional
 
 router = APIRouter(prefix="/grades", tags=["Grades"])
 
@@ -19,11 +20,22 @@ def create_grade(
     payload: GradeCreateSchema,
     db: Session = Depends(get_db),
      _: User = Depends(require_admin)):
+    
+    # Checking if a grade with the same name already exists
     existing_grade = db.query(Grade).filter(Grade.name == payload.name.strip()).first()
     if existing_grade:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Grade with this name already exists")
 
-    grade = Grade(name=payload.name)
+    # Checking if the language_id exists in the languages table
+    language = db.get(Language, payload.language_id)
+
+    if not language:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Language not found"
+        )
+
+    grade = Grade(name=payload.name, language_id=payload.language_id, badge=payload.badge, order_number=payload.order_number)
     db.add(grade)
     db.commit()
     db.refresh(grade)
@@ -74,15 +86,22 @@ def update_grade(
 @router.get("/getAll")
 def get_grades(
     pagination: PaginationSchema = Depends(),
+    language_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
     skip = (pagination.page - 1) * pagination.size
 
-    total = db.query(func.count(Grade.id)).scalar()
+    query = db.query(Grade)
+
+    if language_id is not None:
+        query = query.filter(Grade.language_id == language_id)
+
+    total = query.with_entities(func.count(Grade.id)).scalar()
 
     grades = (
-        db.query(Grade)
+        query
+        .order_by(Grade.order_number.asc())
         .offset(skip)
         .limit(pagination.size)
         .all()
@@ -133,9 +152,6 @@ def delete_grade(
     return {
         "detail": "Grade deleted successfully"
     }
-
-# Endpoint for getting all grades without pagination (for dropdowns, etc.)
-from typing import List
 
 # Endpoint to get all grades without pagination (used as a foreign key selector, e.g. Unit page)
 @router.get("/all", response_model=List[GradeResponseSchema])

@@ -9,6 +9,7 @@ from app.model.users import User
 from sqlalchemy import func
 from app.model.unit import Unit
 from app.model.grade import Grade
+from app.model.language import Language
 from app.core.storage import storage_service
 from typing import List
 
@@ -19,16 +20,24 @@ router = APIRouter(prefix="/subjects", tags=["Subjects"])
 async def create_subject(
     name: str = Form(...),
     grade_id: int = Form(...),
+    language_id: int = Form(...),
     thumbnail: str | None = Form(default=None),
+    badge: str | None = Form(default=None),
+    order_number: int | None = Form(default=None),
     file: UploadFile | None = File(default=None),
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin)):
-
+    _: User = Depends(require_admin)
+):
     grade = db.get(Grade, grade_id)
     if not grade:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Grade not found")
 
-    existing_subject = db.query(Subject).filter(Subject.name == name.strip()).first()
+    language = db.get(Language, language_id)
+    if not language:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Language not found")
+
+    new_name = name.strip()
+    existing_subject = db.query(Subject).filter(Subject.name == new_name).first()
     if existing_subject:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Subject with this name already exists")
 
@@ -36,7 +45,14 @@ async def create_subject(
     if file is not None:
         image_url = await storage_service.upload_image(file, "subjects")
 
-    subject = Subject(name=name, thumbnail=image_url, grade_id=grade_id)
+    subject = Subject(
+        name=new_name,
+        thumbnail=image_url,
+        grade_id=grade_id,
+        language_id=language_id,
+        badge=badge,
+        order_number=order_number
+    )
     db.add(subject)
     db.commit()
     db.refresh(subject)
@@ -105,6 +121,7 @@ async def update_subject(
 @router.get("/getAll")
 def get_subjects(
     grade_id: int | None = None,
+    language_id: int | None = None,
     pagination: PaginationSchema = Depends(),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
@@ -115,10 +132,14 @@ def get_subjects(
     if grade_id is not None:
         query = query.filter(Subject.grade_id == grade_id)
 
+    if language_id is not None:
+        query = query.filter(Subject.language_id == language_id)
+
     total = query.with_entities(func.count(Subject.id)).scalar()
 
     subjects = (
         query
+        .order_by(Subject.order_number.asc())
         .offset(skip)
         .limit(pagination.size)
         .all()
