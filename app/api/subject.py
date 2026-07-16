@@ -65,9 +65,9 @@ async def update_subject(
     name: str = Form(...),
     grade_id: int = Form(...),
     language_id: int = Form(...),
-    order_number: int | None = Form(default=None),
-    badge: str | None = Form(default=None),
     thumbnail: str | None = Form(default=None),
+    badge: str | None = Form(default=None),
+    order_number: int | None = Form(default=None),
     file: UploadFile | None = File(default=None),
     db: Session = Depends(get_db),
     current_user=Depends(require_admin)
@@ -83,6 +83,10 @@ async def update_subject(
     grade = db.get(Grade, grade_id)
     if not grade:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Grade not found")
+
+    language = db.get(Language, language_id)
+    if not language:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Language not found")
 
     new_name = name.strip()
     new_grade_id = grade_id
