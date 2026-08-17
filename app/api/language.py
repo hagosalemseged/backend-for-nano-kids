@@ -7,7 +7,7 @@ from app.schema.pagination import PaginationSchema
 from app.core.dependencies import get_current_user, require_admin
 from app.model.users import User
 from sqlalchemy import func
-from app.model.unit_lesson import LessonTranslation
+from app.model.unit_lesson import UnitTranslation
 from typing import List
 
 router = APIRouter(prefix="/languages", tags=["Languages"])

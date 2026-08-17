@@ -11,7 +11,7 @@ from app.model.subject import Subject
 from sqlalchemy import func,desc
 from app.model.unit import Unit
 from app.model.language import Language
-from app.model.unit_lesson import LessonTranslation
+from app.model.unit_lesson import UnitTranslation
 from app.core.storage import storage_service
 
 router = APIRouter(prefix="/unitsTranslation", tags=["Units Translation"])

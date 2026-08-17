@@ -5,4 +5,5 @@ from .unit import Unit
 from .users import User
 from .student_profile import StudentProfile
 from .student_progress import StudentProgress
-from .unit_lesson import LessonTranslation
+from .unit_lesson import UnitTranslation
+from .learning_item import LearningItem

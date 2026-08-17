@@ -9,7 +9,7 @@ from app.model.users import User
 from sqlalchemy import func,desc
 from app.model.grade import Grade
 from app.model.subject import Subject
-from app.model.unit_lesson import LessonTranslation
+from app.model.unit_lesson import UnitTranslation
 from app.core.storage import storage_service
 from typing import List, Optional
 
