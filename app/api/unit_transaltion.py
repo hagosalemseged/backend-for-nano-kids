@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.model.unit import Unit
-from app.schema.unit_translation import LessonTranslationCreateSchema, LessonTranslationUpdateSchema, LessonTranslationResponseSchema
+from app.schema.unit_translation import LessonTranslationCreateSchema, LessonTranslationUpdateSchema, LessonTranslationResponseSchema, UnitTranslationResponseSchema
 from app.schema.pagination import PaginationSchema
 from app.core.dependencies import get_current_user, require_admin
 from app.model.users import User
@@ -16,13 +16,13 @@ from app.core.storage import storage_service
 
 router = APIRouter(prefix="/unitsTranslation", tags=["Units Translation"])
 
-# Endpoint to create a new lesson translation (admin only)
-@router.post("/add", response_model=LessonTranslationResponseSchema, status_code=status.HTTP_201_CREATED)
-async def create_lesson_translation(
+# Endpoint to create a new unit translation (admin only)
+@router.post("/add", response_model=UnitTranslationResponseSchema, status_code=status.HTTP_201_CREATED)
+async def create_unit_translation(
     unit_id: int = Form(...),
     language_id: int = Form(...),
     title: str = Form(...),
-    content: str = Form(...),
+    content: str | None = Form(default=None),
     access_type: str = Form(default="FREE"),
     image_url: str | None = Form(default=None),
     audio_url: str | None = Form(default=None),
@@ -54,11 +54,11 @@ async def create_lesson_translation(
     # Check duplicate title within same unit and language
     try:
         existing_lesson_translation = (
-            db.query(LessonTranslation)
+            db.query(UnitTranslation)
             .filter(
-                LessonTranslation.unit_id == unit_id,
-                LessonTranslation.language_id == language_id,
-                LessonTranslation.title.ilike(title.strip())
+                UnitTranslation.unit_id == unit_id,
+                UnitTranslation.language_id == language_id,
+                UnitTranslation.title.ilike(title.strip())
             )
             .first()
         )
@@ -81,7 +81,7 @@ async def create_lesson_translation(
         if video_file is not None and getattr(video_file, "filename", None):
             uploaded_video_url = await storage_service.upload_file(video_file, "unit-translations/video")
 
-        lesson_translation = LessonTranslation(
+        unit_translation = UnitTranslation(
             unit_id=unit_id,
             language_id=language_id,
             title=title.strip(),
@@ -92,26 +92,26 @@ async def create_lesson_translation(
             video_url=uploaded_video_url
         )
 
-        db.add(lesson_translation)
+        db.add(unit_translation)
         db.commit()
-        db.refresh(lesson_translation)
-        return lesson_translation
+        db.refresh(unit_translation)
+        return unit_translation
     except HTTPException:
         db.rollback()
         raise
     except Exception as exc:
         db.rollback()
-        if "uq_lesson_language" in str(exc) or "duplicate key" in str(exc).lower():
+        if "uq_unit_language" in str(exc) or "duplicate key" in str(exc).lower():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="A lesson translation already exists for this unit and language"
+                detail="A unit translation already exists for this unit and language"
             ) from exc
-        raise HTTPException(status_code=500, detail=f"Failed to create lesson translation: {exc}") from exc
+        raise HTTPException(status_code=500, detail=f"Failed to create unit translation: {exc}") from exc
 
 # Endpoint to update unit translation by admin only
-@router.put("/update/{lesson_translation_id}", response_model=LessonTranslationResponseSchema)
-async def update_lesson_translation(
-    lesson_translation_id: int,
+@router.put("/update/{unit_translation_id}", response_model=UnitTranslationResponseSchema)
+async def update_unit_translation(
+    unit_translation_id: int,
     title: str | None = Form(default=None),
     content: str | None = Form(default=None),
     access_type: str | None = Form(default=None),
@@ -124,9 +124,9 @@ async def update_lesson_translation(
     db: Session = Depends(get_db),
     current_user=Depends(require_admin)
 ):
-    lesson_translation = db.get(LessonTranslation, lesson_translation_id)
+    unit_translation = db.get(UnitTranslation, unit_translation_id)
 
-    if not lesson_translation:
+    if not unit_translation:
         raise HTTPException(
             status_code=404,
             detail="Unit translation not found"
@@ -135,58 +135,58 @@ async def update_lesson_translation(
     # Check duplicate title within same unit and language
     try:
         if title is not None:
-            existing_lesson_translation = (
-                db.query(LessonTranslation)
+            existing_unit_translation = (
+                db.query(UnitTranslation)
                 .filter(
-                    LessonTranslation.id != lesson_translation_id,
-                    LessonTranslation.unit_id == lesson_translation.unit_id,
-                    LessonTranslation.language_id == lesson_translation.language_id,
-                    LessonTranslation.title.ilike(title.strip())
+                    UnitTranslation.id != unit_translation_id,
+                    UnitTranslation.unit_id == unit_translation.unit_id,
+                    UnitTranslation.language_id == unit_translation.language_id,
+                    UnitTranslation.title.ilike(title.strip())
                 )
                 .first()
             )
 
-            if existing_lesson_translation:
+            if existing_unit_translation:
                 raise HTTPException(
                     status_code=400,
-                    detail="Lesson translation already exists for this unit and language"
+                    detail="Unit translation already exists for this unit and language"
                 )
 
         if title is not None:
-            lesson_translation.title = title.strip()
+            unit_translation.title = title.strip()
         if content is not None:
-            lesson_translation.content = content.strip()
+            unit_translation.content = content.strip()
         if access_type is not None:
-            lesson_translation.access_type = access_type
+            unit_translation.access_type = access_type
         if file is not None and getattr(file, "filename", None):
-            lesson_translation.image_url = await storage_service.upload_image(file, "unit-translations/images")
+            unit_translation.image_url = await storage_service.upload_image(file, "unit-translations/images")
         elif image_url is not None:
-            lesson_translation.image_url = image_url
+            unit_translation.image_url = image_url
 
         if audio_file is not None and getattr(audio_file, "filename", None):
-            lesson_translation.audio_url = await storage_service.upload_file(audio_file, "unit-translations/audio")
+            unit_translation.audio_url = await storage_service.upload_file(audio_file, "unit-translations/audio")
         elif audio_url is not None:
-            lesson_translation.audio_url = audio_url
+            unit_translation.audio_url = audio_url
 
         if video_file is not None and getattr(video_file, "filename", None):
-            lesson_translation.video_url = await storage_service.upload_file(video_file, "unit-translations/video")
+            unit_translation.video_url = await storage_service.upload_file(video_file, "unit-translations/video")
         elif video_url is not None:
-            lesson_translation.video_url = video_url
+            unit_translation.video_url = video_url
 
         db.commit()
-        db.refresh(lesson_translation)
-        return lesson_translation
+        db.refresh(unit_translation)
+        return unit_translation
     except HTTPException:
         db.rollback()
         raise
     except Exception as exc:
         db.rollback()
-        if "uq_lesson_language" in str(exc) or "duplicate key" in str(exc).lower():
+        if "uq_unit_language" in str(exc) or "duplicate key" in str(exc).lower():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="A lesson translation already exists for this unit and language"
+                detail="A unit translation already exists for this unit and language"
             ) from exc
-        raise HTTPException(status_code=500, detail=f"Failed to update lesson translation: {exc}") from exc
+        raise HTTPException(status_code=500, detail=f"Failed to update unit translation: {exc}") from exc
 
 # Endpoint to get all units translation with pagination
 @router.get("/getAll")
@@ -199,18 +199,18 @@ def get_units_translations(
 ):
     skip = (pagination.page - 1) * pagination.size
 
-    query = db.query(LessonTranslation)
+    query = db.query(UnitTranslation)
 
     if unit_id is not None:
-        query = query.filter(LessonTranslation.unit_id == unit_id)
+        query = query.filter(UnitTranslation.unit_id == unit_id)
     if language_id is not None:
-        query = query.filter(LessonTranslation.language_id == language_id)
+        query = query.filter(UnitTranslation.language_id == language_id)
 
-    total = query.with_entities(func.count(LessonTranslation.id)).scalar()
+    total = query.with_entities(func.count(UnitTranslation.id)).scalar()
 
     unit_translations = (
         query
-        .order_by(desc(LessonTranslation.id))
+        .order_by(desc(UnitTranslation.id))
         .offset(skip)
         .limit(pagination.size)
         .all()
@@ -225,22 +225,22 @@ def get_units_translations(
     }
 
 # Delete unit translation by id (admin only)
-@router.delete("/delete/{lesson_translation_id}")
-def delete_lesson_translation(
-    lesson_translation_id: int,
+@router.delete("/delete/{unit_translation_id}")
+def delete_unit_translation(
+    unit_translation_id: int,
     db: Session = Depends(get_db),
     current_user=Depends(require_admin)
 ):
-    lesson_translation = db.get(LessonTranslation, lesson_translation_id)
+    unit_translation = db.get(UnitTranslation, unit_translation_id)
 
-    if not lesson_translation:
+    if not unit_translation:
         raise HTTPException(
             status_code=404,
             detail="Unit translation not found"
         )
     
     # If no associations, proceed to delete
-    db.delete(lesson_translation)
+    db.delete(unit_translation)
     db.commit()
     return {
         "detail": "Unit translation deleted successfully"
