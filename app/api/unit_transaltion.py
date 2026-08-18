@@ -83,7 +83,7 @@ async def create_unit_translation(
             unit_id=unit_id,
             language_id=language_id,
             title=title.strip(),
-            content=content.strip(),
+            content=content.strip() if content else None,
             access_type=access_type,
             image_url=uploaded_image_url,
             audio_url=uploaded_audio_url,
