@@ -2,12 +2,10 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.model.unit import Unit
-from app.schema.unit_translation import LessonTranslationCreateSchema, LessonTranslationUpdateSchema, LessonTranslationResponseSchema, UnitTranslationResponseSchema
+from app.schema.unit_translation import UnitTranslationResponseSchema
 from app.schema.pagination import PaginationSchema
 from app.core.dependencies import get_current_user, require_admin
 from app.model.users import User
-from app.model.grade import Grade
-from app.model.subject import Subject
 from sqlalchemy import func,desc
 from app.model.unit import Unit
 from app.model.language import Language
