@@ -8,6 +8,7 @@ from app.api.language import router as language_router
 from app.api.subject import router as subject_router
 from app.api.unit import router as unit_router
 from app.api.unit_transaltion import router as unit_translation_router
+from app.api.learning_item import router as learning_item_router
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
@@ -53,3 +54,4 @@ app.include_router(language_router)
 app.include_router(subject_router)
 app.include_router(unit_router)
 app.include_router(unit_translation_router)
+app.include_router(learning_item_router)
