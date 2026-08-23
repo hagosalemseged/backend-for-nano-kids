@@ -6,7 +6,7 @@ from app.schema.unit_translation import UnitTranslationResponseSchema
 from app.schema.pagination import PaginationSchema
 from app.core.dependencies import get_current_user, require_admin
 from app.model.users import User
-from sqlalchemy import func,desc
+from sqlalchemy import func,desc,asc
 from app.model.unit import Unit
 from app.model.language import Language
 from app.model.unit_lesson import UnitTranslation
@@ -208,7 +208,7 @@ def get_units_translations(
 
     unit_translations = (
         query
-        .order_by(desc(UnitTranslation.id))
+        .order_by(asc(UnitTranslation.id))
         .offset(skip)
         .limit(pagination.size)
         .all()
