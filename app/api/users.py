@@ -7,11 +7,13 @@ from app.model.users import User, UserRole
 from app.schema.users import (
     StaffUserCreateSchema,
     StaffUserResponseSchema,
-    StaffUserUpdateSchema
+    StaffUserUpdateSchema,
+    ChangePasswordSchema,
+    UpdateProfileSchema,
 )
 from app.schema.pagination import PaginationSchema
 
-from app.core.security import hash_password
+from app.core.security import hash_password, verify_password
 from app.core.password import generate_temporary_password
 from app.core.email import send_user_credentials
 
@@ -397,6 +399,10 @@ def update_staff_user(
 
     return user
 
+# ========================================================
+# DELETE
+# =========================================================
+
 @router.delete(
     "/delete/{user_id}",
     status_code=status.HTTP_200_OK,
@@ -451,3 +457,109 @@ def delete_staff_user(
         "detail": "User deleted successfully"
     }
 
+
+# =========================================================
+# CHANGE PASSWORD
+# =========================================================
+
+@router.put("/change-password")
+def change_password(
+    payload: ChangePasswordSchema,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # -----------------------------------------------------
+    # Check current password
+    # -----------------------------------------------------
+
+    if not verify_password(
+        payload.current_password,
+        current_user.password_hash,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect",
+        )
+
+    # -----------------------------------------------------
+    # Prevent same password
+    # -----------------------------------------------------
+
+    if verify_password(
+        payload.new_password,
+        current_user.password_hash,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from current password",
+        )
+
+    # -----------------------------------------------------
+    # Hash new password
+    # -----------------------------------------------------
+
+    current_user.password_hash = hash_password(
+        payload.new_password
+    )
+
+    db.commit()
+
+    return {
+        "detail": "Password changed successfully"
+    }
+
+# =========================================================
+# Change Profile (First Name, Last Name, Phone Number)
+# =========================================================
+
+@router.put("/profile")
+def update_profile(
+    payload: UpdateProfileSchema,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # -----------------------------------------------------
+    # Validate names
+    # -----------------------------------------------------
+
+    first_name = payload.first_name.strip()
+    last_name = payload.last_name.strip()
+    phone_number = payload.phone_number.strip()
+
+    if not first_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="First name cannot be empty",
+        )
+
+    if not last_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Last name cannot be empty",
+        )
+
+    if not phone_number:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Phone number cannot be empty",
+        )
+
+    # -----------------------------------------------------
+    # Update profile
+    # -----------------------------------------------------
+
+    current_user.first_name = first_name
+    current_user.last_name = last_name
+    current_user.phone_number = phone_number
+
+    db.commit()
+    db.refresh(current_user)
+
+    return {
+        "id": current_user.id,
+        "email": current_user.email,
+        "first_name": current_user.first_name,
+        "last_name": current_user.last_name,
+        "phone_number": current_user.phone_number,
+        "role": current_user.role.value,
+    }

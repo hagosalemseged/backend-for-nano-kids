@@ -49,3 +49,12 @@ class StaffUserResponseSchema(BaseModel):
     model_config = {
         "from_attributes": True
     }
+
+class ChangePasswordSchema(BaseModel):
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=6)
+
+class UpdateProfileSchema(BaseModel):
+    first_name: str = Field(..., min_length=1, max_length=100)
+    last_name: str = Field(..., min_length=1, max_length=100)
+    phone_number: str = Field(..., min_length=1, max_length=20)
