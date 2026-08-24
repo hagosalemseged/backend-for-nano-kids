@@ -21,7 +21,6 @@ class UserResponseSchema(BaseModel):
         "from_attributes": True
     }
 
-
 class LoginSchema(BaseModel):
     email: EmailStr
     password: str
@@ -29,3 +28,6 @@ class LoginSchema(BaseModel):
 class TokenSchema(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+class ResetPasswordSchema(BaseModel):
+    email: EmailStr
