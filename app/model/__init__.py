@@ -7,3 +7,4 @@ from .student_profile import StudentProfile
 from .student_progress import StudentProgress
 from .unit_lesson import UnitTranslation
 from .learning_item import LearningItem
+from .student import Student

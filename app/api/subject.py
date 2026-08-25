@@ -2,9 +2,16 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.model.subject import Subject
-from app.schema.subject import SubjectCreateSchema, SubjectResponseSchema
+from app.schema.subject import (
+    SubjectCreateSchema, 
+    SubjectResponseSchema,
+)
 from app.schema.pagination import PaginationSchema
-from app.core.dependencies import get_current_user, require_admin
+from app.core.dependencies import (
+    get_current_user,
+    require_admin,
+    get_optional_current_user
+)
 from app.model.users import User
 from sqlalchemy import func
 from app.model.unit import Unit
@@ -131,14 +138,14 @@ async def update_subject(
 
     return subject
 
-# Endpoint to get all subjects with pagination
+# Endpoint to get all subjects with pagination and protected by
 @router.get("/getAll")
 def get_subjects(
     grade_id: int | None = None,
     language_id: int | None = None,
     pagination: PaginationSchema = Depends(),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user)
+    current_user: User | None = Depends(get_optional_current_user),
 ):
     skip = (pagination.page - 1) * pagination.size
 

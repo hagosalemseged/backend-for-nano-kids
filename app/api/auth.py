@@ -9,8 +9,8 @@ from app.core.security import (
 
 from app.model.users import User, UserRole
 from app.schema.auth import (
-    UserCreateSchema,
-    UserResponseSchema,
+    ParentCreateSchema,
+    ParentResponseSchema,
     LoginSchema,
     TokenSchema,
     ResetPasswordSchema,
@@ -31,12 +31,12 @@ router = APIRouter(
 # =========================================================
 
 @router.post(
-    "/register",
-    response_model=UserResponseSchema,
+    "/register-parent",
+    response_model=ParentResponseSchema,
     status_code=status.HTTP_201_CREATED,
 )
 def register_user(
-    payload: UserCreateSchema,
+    payload: ParentCreateSchema,
     db: Session = Depends(get_db),
 ):
 
@@ -59,23 +59,23 @@ def register_user(
         )
 
     # -----------------------------------------------------
-    # Create user
+    # Create Parent user
     # -----------------------------------------------------
-
-    user = User(
+    parent = User(
         first_name=payload.first_name.strip(),
         last_name=payload.last_name.strip(),
         email=email,
         phone_number=payload.phone_number.strip(),
         password_hash=hash_password(payload.password),
-        role=payload.role,
+        role=UserRole.PARENT,
+        is_active=True,
     )
 
-    db.add(user)
+    db.add(parent)
     db.commit()
-    db.refresh(user)
+    db.refresh(parent)
 
-    return user
+    return parent
 
 
 # =========================================================
