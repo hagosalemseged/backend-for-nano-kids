@@ -4,7 +4,7 @@ from app.core.database import get_db
 from app.model.language import Language
 from app.schema.language import LanguageCreateSchema, LanguageResponseSchema
 from app.schema.pagination import PaginationSchema
-from app.core.dependencies import get_current_user, require_admin
+from app.core.dependencies import get_current_user, require_admin, get_optional_current_user
 from app.model.users import User
 from sqlalchemy import func
 from app.model.unit_lesson import UnitTranslation
@@ -76,7 +76,7 @@ def update_language(
 def get_languages(
     pagination: PaginationSchema = Depends(),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user)
+    current_user: User | None = Depends(get_optional_current_user),
 ):
     skip = (pagination.page - 1) * pagination.size
 
