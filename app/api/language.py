@@ -113,7 +113,7 @@ def delete_language(
         )
     
     # Check if any lesson translations are associated with this language
-    associated_lessons = db.query(LessonTranslation).filter(LessonTranslation.language_id == language_id).first()
+    associated_lessons = db.query(UnitTranslation).filter(UnitTranslation.language_id == language_id).first()
     if associated_lessons:
         raise HTTPException(
             status_code=400,
