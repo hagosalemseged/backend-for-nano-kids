@@ -96,6 +96,21 @@ def login(
         select(User).where(User.email == data.email.lower())
     )
 
+    print("========== LOGIN DEBUG ==========")
+    print("EMAIL:", data.email)
+    print("USER FOUND:", user is not None)
+
+    if user:
+        print("USER ID:", user.id)
+        print("USER EMAIL:", user.email)
+        print("HASH:", user.password_hash)
+        print("PASSWORD VALID:", verify_password(
+            data.password,
+            user.password_hash
+        ))
+
+    print("=================================")
+
     # 2. Validate credentials
     if not user or not verify_password(
         data.password,
