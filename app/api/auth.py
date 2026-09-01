@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 from app.core.database import get_db
 from app.core.security import (
     hash_password,
@@ -11,8 +12,8 @@ from app.model.users import User, UserRole
 from app.schema.auth import (
     ParentCreateSchema,
     ParentResponseSchema,
-    LoginSchema,
-    TokenSchema,
+    LoginRequest,
+    LoginResponse,
     ResetPasswordSchema,
 )
 
@@ -84,96 +85,49 @@ def register_user(
 
 @router.post(
     "/login",
-    response_model=TokenSchema,
+    response_model=LoginResponse,
 )
-def login_user(
-    payload: LoginSchema,
+def login(
+    data: LoginRequest,
     db: Session = Depends(get_db),
 ):
-
-    email = payload.email.lower().strip()
-
-    # -----------------------------------------------------
-    # Find user
-    # -----------------------------------------------------
-
-    user = (
-        db.query(User)
-        .filter(User.email == email)
-        .first()
+    # 1. Find user
+    user = db.scalar(
+        select(User).where(User.email == data.email.lower())
     )
 
-    # -----------------------------------------------------
-    # Invalid email/password
-    # -----------------------------------------------------
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
-            headers={
-                "WWW-Authenticate": "Bearer"
-            },
-        )
-
-    # -----------------------------------------------------
-    # Verify password
-    # -----------------------------------------------------
-
-    if not verify_password(
-        payload.password,
+    # 2. Validate credentials
+    if not user or not verify_password(
+        data.password,
         user.password_hash,
     ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
-            headers={
-                "WWW-Authenticate": "Bearer"
-            },
+            detail="Invalid email or password.",
         )
 
-    # -----------------------------------------------------
-    # Check active account
-    # -----------------------------------------------------
-
+    # 3. Check account status
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Your account is inactive",
+            detail="Account is inactive.",
         )
 
-    # -----------------------------------------------------
-    # Only staff users can login
-    # -----------------------------------------------------
-
-    allowed_roles = {
-        UserRole.ADMIN,
-        UserRole.TEACHER,
-        UserRole.PARENT,
-    }
-
-    if user.role not in allowed_roles:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="This account is not allowed to access the system",
-        )
-
-    # -----------------------------------------------------
-    # Create JWT
-    # -----------------------------------------------------
-
+    # 4. Create JWT
     access_token = create_access_token(
         data={
             "sub": str(user.id),
-            "email": user.email,
             "role": user.role.value,
         }
     )
 
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-    }
+    # 5. Return response
+    return LoginResponse(
+        access_token=access_token,
+        token_type="bearer",
+        user_id=str(user.id),
+        role=user.role,
+    )
 
 # =========================================================
 # RESET PASSWORD

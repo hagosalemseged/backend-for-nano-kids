@@ -20,9 +20,15 @@ class ParentResponseSchema(BaseModel):
         "from_attributes": True
     }
 
-class LoginSchema(BaseModel):
+class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user_id: str
+    role: UserRole
 
 class TokenSchema(BaseModel):
     access_token: str
@@ -30,3 +36,4 @@ class TokenSchema(BaseModel):
 
 class ResetPasswordSchema(BaseModel):
     email: EmailStr
+
