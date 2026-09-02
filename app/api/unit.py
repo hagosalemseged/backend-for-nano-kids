@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.model.unit import Unit
-from app.schema.unit import UnitCreateSchema, UnitResponseSchema, UnitUpdateSchema
+from app.schema.unit import UnitResponseSchema
 from app.schema.pagination import PaginationSchema
-from app.core.dependencies import get_current_user, require_admin
+from app.core.dependencies import get_current_user, require_admin, get_optional_current_user
 from app.model.users import User
 from sqlalchemy import func,desc
 from app.model.grade import Grade
@@ -135,19 +135,37 @@ def get_units(
     pagination: PaginationSchema = Depends(),
     grade_id: Optional[int] = None,
     subject_id: Optional[int] = None,
+    search: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user)
+    current_user: User | None = Depends(get_optional_current_user),
 ):
     skip = (pagination.page - 1) * pagination.size
 
     query = db.query(Unit)
+
+    # Filter by grade
     if grade_id is not None:
         query = query.filter(Unit.grade_id == grade_id)
+
+    # Filter by subject
     if subject_id is not None:
         query = query.filter(Unit.subject_id == subject_id)
 
-    total = query.with_entities(func.count(Unit.id)).scalar()
+    # Search by unit name/title
+    if search:
+        search = search.strip()
 
+        if search:
+            query = query.filter(
+                Unit.title.ilike(f"%{search}%")
+            )
+
+    # Total after filters
+    total = query.with_entities(
+        func.count(Unit.id)
+    ).scalar()
+
+    # Pagination
     units = (
         query
         .order_by(desc(Unit.id))
@@ -161,9 +179,8 @@ def get_units(
         "size": pagination.size,
         "total": total,
         "pages": (total + pagination.size - 1) // pagination.size,
-        "data": units
+        "data": units,
     }
-
 # Delete unit by id (admin only)
 @router.delete("/delete/{unit_id}")
 def delete_unit(
@@ -180,7 +197,7 @@ def delete_unit(
         )
 
     # Check if any lessons are associated with this unit
-    associated_lessons = db.query(LessonTranslation).filter(LessonTranslation.unit_id == unit_id).first()
+    associated_lessons = db.query(UnitTranslation).filter(UnitTranslation.unit_id == unit_id).first()
     if associated_lessons:
         raise HTTPException(
             status_code=400,

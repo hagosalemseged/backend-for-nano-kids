@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.model.subject import Subject
 from app.schema.subject import (
-    SubjectCreateSchema, 
     SubjectResponseSchema,
 )
 from app.schema.pagination import PaginationSchema
@@ -143,6 +142,7 @@ async def update_subject(
 def get_subjects(
     grade_id: int | None = None,
     language_id: int | None = None,
+    search: str | None = None,
     pagination: PaginationSchema = Depends(),
     db: Session = Depends(get_db),
     current_user: User | None = Depends(get_optional_current_user),
@@ -150,13 +150,29 @@ def get_subjects(
     skip = (pagination.page - 1) * pagination.size
 
     query = db.query(Subject)
+
+    # Filter by grade
     if grade_id is not None:
-        query = query.filter(Subject.grade_id == grade_id)
+        query = query.filter(
+            Subject.grade_id == grade_id
+        )
 
+    # Filter by language
     if language_id is not None:
-        query = query.filter(Subject.language_id == language_id)
+        query = query.filter(
+            Subject.language_id == language_id
+        )
 
-    total = query.with_entities(func.count(Subject.id)).scalar()
+    # Search by subject name
+    if search:
+        query = query.filter(
+            Subject.name.ilike(f"%{search.strip()}%")
+        )
+
+    # Total after applying all filters
+    total = query.with_entities(
+        func.count(Subject.id)
+    ).scalar()
 
     subjects = (
         query
@@ -170,8 +186,8 @@ def get_subjects(
         "page": pagination.page,
         "size": pagination.size,
         "total": total,
-        "pages": (total + pagination.size - 1) // pagination.size,
-        "data": subjects
+        "pages": ((total + pagination.size - 1)// pagination.size),
+        "data": subjects,
     }
 
 # Delete subject by id (admin only)
