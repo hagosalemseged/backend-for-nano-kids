@@ -6,7 +6,7 @@ from app.schema.unit import UnitResponseSchema
 from app.schema.pagination import PaginationSchema
 from app.core.dependencies import get_current_user, require_admin, get_optional_current_user
 from app.model.users import User
-from sqlalchemy import func,desc
+from sqlalchemy import func,asc
 from app.model.grade import Grade
 from app.model.subject import Subject
 from app.model.unit_lesson import UnitTranslation
@@ -168,7 +168,7 @@ def get_units(
     # Pagination
     units = (
         query
-        .order_by(desc(Unit.id))
+        .order_by(asc(Unit.sort_order))
         .offset(skip)
         .limit(pagination.size)
         .all()
