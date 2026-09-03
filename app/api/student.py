@@ -332,3 +332,46 @@ def delete_student(
     return {
         "detail": "Student deleted successfully"
     }
+
+# =========================================================
+# GET STUDENTS BY PARENT
+# =========================================================
+
+@router.get(
+    "/parent/{parent_id}",
+    response_model=list[StudentResponse],
+)
+def get_students_by_parent(
+    parent_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # -----------------------------------------
+    # Validate parent
+    # -----------------------------------------
+
+    parent = db.scalar(
+        select(User).where(
+            User.id == parent_id
+        )
+    )
+
+    if not parent:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Parent not found",
+        )
+
+    # -----------------------------------------
+    # Get students
+    # -----------------------------------------
+
+    students = db.scalars(
+        select(Student)
+        .where(
+            Student.parent_id == parent_id
+        )
+        .order_by(Student.id.desc())
+    ).all()
+
+    return students
