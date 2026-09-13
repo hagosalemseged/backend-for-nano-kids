@@ -2,7 +2,10 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.model.unit import Unit
-from app.schema.unit_translation import UnitTranslationResponseSchema
+from app.schema.unit_translation import (
+    UnitTranslationResponseSchema,
+    UnitTranslationGetAllResponseSchema
+)
 from app.schema.pagination import PaginationSchema
 from app.core.dependencies import get_optional_current_user, require_admin
 from app.model.users import User
@@ -10,6 +13,7 @@ from sqlalchemy import func,desc,asc
 from app.model.unit import Unit
 from app.model.language import Language
 from app.model.unit_lesson import UnitTranslation
+from app.model.learning_item import LearningItem
 from app.core.storage import storage_service
 
 router = APIRouter(prefix="/unitsTranslation", tags=["Units Translation"])
@@ -187,39 +191,100 @@ async def update_unit_translation(
         raise HTTPException(status_code=500, detail=f"Failed to update unit translation: {exc}") from exc
 
 # Endpoint to get all units translation or content with pagination
-@router.get("/getAll")
-def get_units_translations(
+@router.get(
+    "/getAll",
+    response_model=UnitTranslationGetAllResponseSchema,
+)
+def get_all_unit_translations(
     unit_id: int | None = None,
     language_id: int | None = None,
-    pagination: PaginationSchema = Depends(),
+    page: int = 1,
+    size: int = 10,
     db: Session = Depends(get_db),
-    current_user: User | None = Depends(get_optional_current_user),
 ):
-    skip = (pagination.page - 1) * pagination.size
+    # --------------------------------------------
+    # BASE QUERY
+    # --------------------------------------------
 
     query = db.query(UnitTranslation)
 
     if unit_id is not None:
-        query = query.filter(UnitTranslation.unit_id == unit_id)
+        query = query.filter(
+            UnitTranslation.unit_id == unit_id
+        )
+
     if language_id is not None:
-        query = query.filter(UnitTranslation.language_id == language_id)
+        query = query.filter(
+            UnitTranslation.language_id == language_id
+        )
 
-    total = query.with_entities(func.count(UnitTranslation.id)).scalar()
+    # --------------------------------------------
+    # TOTAL
+    # --------------------------------------------
 
-    unit_translations = (
+    total = query.count()
+
+    # --------------------------------------------
+    # PAGINATION
+    # --------------------------------------------
+
+    offset = (page - 1) * size
+
+    lessons = (
         query
-        .order_by(asc(UnitTranslation.id))
-        .offset(skip)
-        .limit(pagination.size)
+        .order_by(
+            asc(UnitTranslation.id)
+        )
+        .offset(offset)
+        .limit(size)
         .all()
     )
 
+    # --------------------------------------------
+    # BUILD RESPONSE
+    # --------------------------------------------
+
+    data = []
+
+    for lesson in lessons:
+
+        learning_items = (
+            db.query(LearningItem)
+            .filter(
+                LearningItem.unit_translation_id == lesson.id
+            )
+            .order_by(
+                asc(LearningItem.sort_order),
+                asc(LearningItem.id),
+            )
+            .all()
+        )
+
+        data.append({
+            "id": lesson.id,
+            "unit_id": lesson.unit_id,
+            "language_id": lesson.language_id,
+            "title": lesson.title,
+            "content": lesson.content,
+            "access_type": lesson.access_type,
+            "image_url": lesson.image_url,
+            "audio_url": lesson.audio_url,
+            "video_url": lesson.video_url,
+            "learning_items": learning_items,
+        })
+
+    # --------------------------------------------
+    # PAGES
+    # --------------------------------------------
+
+    pages = (total + size - 1) // size
+
     return {
-        "page": pagination.page,
-        "size": pagination.size,
+        "page": page,
+        "size": size,
         "total": total,
-        "pages": (total + pagination.size - 1) // pagination.size,
-        "data": unit_translations
+        "pages": pages,
+        "data": data,
     }
 
 # Delete unit translation by id (admin only)

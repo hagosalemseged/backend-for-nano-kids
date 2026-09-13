@@ -19,6 +19,19 @@ class UnitTranslationUpdateSchema(BaseModel):
     audio_url: str | None = None
     video_url: str | None = None
 
+class LearningItemResponseSchema(BaseModel):
+    id: int
+    unit_translation_id: int
+    value: str
+    image_url: str | None = None
+    audio_url: str | None = None
+    sort_order: int
+
+    model_config = {
+        "from_attributes": True
+    }
+
+
 class UnitTranslationResponseSchema(BaseModel):
     id: int
     unit_id: int
@@ -30,6 +43,16 @@ class UnitTranslationResponseSchema(BaseModel):
     audio_url: str | None
     video_url: str | None
 
+    learning_items: list[LearningItemResponseSchema] = []
+
     model_config = {
         "from_attributes": True
     }
+
+
+class UnitTranslationGetAllResponseSchema(BaseModel):
+    page: int
+    size: int
+    total: int
+    pages: int
+    data: list[UnitTranslationResponseSchema]
