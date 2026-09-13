@@ -4,7 +4,7 @@ from app.core.database import get_db
 from app.model.unit import Unit
 from app.schema.unit_translation import UnitTranslationResponseSchema
 from app.schema.pagination import PaginationSchema
-from app.core.dependencies import get_current_user, require_admin
+from app.core.dependencies import get_optional_current_user, require_admin
 from app.model.users import User
 from sqlalchemy import func,desc,asc
 from app.model.unit import Unit
@@ -186,14 +186,14 @@ async def update_unit_translation(
             ) from exc
         raise HTTPException(status_code=500, detail=f"Failed to update unit translation: {exc}") from exc
 
-# Endpoint to get all units translation with pagination
+# Endpoint to get all units translation or content with pagination
 @router.get("/getAll")
 def get_units_translations(
     unit_id: int | None = None,
     language_id: int | None = None,
     pagination: PaginationSchema = Depends(),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user)
+    current_user: User | None = Depends(get_optional_current_user),
 ):
     skip = (pagination.page - 1) * pagination.size
 
