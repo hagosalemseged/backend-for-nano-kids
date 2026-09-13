@@ -1,20 +1,27 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import select
+
 from app.core.database import get_db
+
 from app.core.security import (
     hash_password,
     verify_password,
     create_access_token,
+    create_refresh_token,
+    decode_token,
 )
 
 from app.model.users import User, UserRole
+
 from app.schema.auth import (
     ParentCreateSchema,
     ParentResponseSchema,
     LoginRequest,
     LoginResponse,
     ResetPasswordSchema,
+    RefreshTokenRequest,
+    RefreshTokenResponse,
 )
 
 from app.core.email import send_reset_password_email
@@ -28,7 +35,7 @@ router = APIRouter(
 
 
 # =========================================================
-# REGISTER
+# REGISTER PARENT
 # =========================================================
 
 @router.post(
@@ -60,8 +67,9 @@ def register_user(
         )
 
     # -----------------------------------------------------
-    # Create Parent user
+    # Create parent
     # -----------------------------------------------------
+
     parent = User(
         first_name=payload.first_name.strip(),
         last_name=payload.last_name.strip(),
@@ -91,13 +99,21 @@ def login(
     data: LoginRequest,
     db: Session = Depends(get_db),
 ):
-    # 1. Find user
-    user = db.scalar(
-        select(User).where(User.email == data.email.lower())
-    )
-    
 
+    # -----------------------------------------------------
+    # 1. Find user
+    # -----------------------------------------------------
+
+    user = db.scalar(
+        select(User).where(
+            User.email == data.email.lower().strip()
+        )
+    )
+
+    # -----------------------------------------------------
     # 2. Validate credentials
+    # -----------------------------------------------------
+
     if not user or not verify_password(
         data.password,
         user.password_hash,
@@ -107,14 +123,20 @@ def login(
             detail="Invalid email or password.",
         )
 
+    # -----------------------------------------------------
     # 3. Check account status
+    # -----------------------------------------------------
+
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account is inactive.",
         )
 
-    # 4. Create JWT
+    # -----------------------------------------------------
+    # 4. Create access token
+    # -----------------------------------------------------
+
     access_token = create_access_token(
         data={
             "sub": str(user.id),
@@ -122,17 +144,34 @@ def login(
         }
     )
 
-    # 5. Return response
+    # -----------------------------------------------------
+    # 5. Create refresh token
+    # -----------------------------------------------------
+
+    refresh_token = create_refresh_token(
+        data={
+            "sub": str(user.id),
+            "role": user.role.value,
+        }
+    )
+
+    # -----------------------------------------------------
+    # 6. Return both tokens
+    # -----------------------------------------------------
+
     return LoginResponse(
         access_token=access_token,
+        refresh_token=refresh_token,
         token_type="bearer",
         user_id=str(user.id),
         role=user.role,
     )
 
+
 # =========================================================
 # RESET PASSWORD
 # =========================================================
+
 @router.post("/reset-password")
 def reset_password(
     payload: ResetPasswordSchema,
@@ -202,7 +241,7 @@ def reset_password(
     )
 
     # -----------------------------------------------------
-    # Temporarily update password
+    # Update password
     # -----------------------------------------------------
 
     user.password_hash = new_password_hash
@@ -223,17 +262,12 @@ def reset_password(
         )
 
         # -------------------------------------------------
-        # Only commit if email succeeds
+        # Commit only if email succeeds
         # -------------------------------------------------
 
         db.commit()
 
     except Exception as exc:
-
-        # -------------------------------------------------
-        # Email failed
-        # Restore database transaction
-        # -------------------------------------------------
 
         db.rollback()
 
@@ -248,3 +282,129 @@ def reset_password(
         ) from exc
 
     return generic_response
+
+
+# =========================================================
+# REFRESH TOKEN
+# =========================================================
+
+@router.post(
+    "/refresh",
+    response_model=RefreshTokenResponse,
+)
+def refresh_access_token(
+    data: RefreshTokenRequest,
+    db: Session = Depends(get_db),
+):
+
+    # -----------------------------------------------------
+    # 1. Decode refresh token
+    # -----------------------------------------------------
+
+    try:
+
+        payload = decode_token(
+            data.refresh_token
+        )
+
+    except ValueError:
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+        )
+
+    # -----------------------------------------------------
+    # 2. Make sure token is a refresh token
+    # -----------------------------------------------------
+
+    if payload.get("type") != "refresh":
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+        )
+
+    # -----------------------------------------------------
+    # 3. Get user ID from token
+    # -----------------------------------------------------
+
+    user_id = payload.get("sub")
+
+    if not user_id:
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+        )
+
+    # -----------------------------------------------------
+    # 4. Validate user ID
+    # -----------------------------------------------------
+
+    try:
+
+        user_id = int(user_id)
+
+    except (TypeError, ValueError):
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+        )
+
+    # -----------------------------------------------------
+    # 5. Get user
+    # -----------------------------------------------------
+
+    user = db.get(User, user_id)
+
+    if not user:
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+        )
+
+    # -----------------------------------------------------
+    # 6. Check user status
+    # -----------------------------------------------------
+
+    if not user.is_active:
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is inactive",
+        )
+
+    # -----------------------------------------------------
+    # 7. Create new access token
+    # -----------------------------------------------------
+
+    new_access_token = create_access_token(
+        data={
+            "sub": str(user.id),
+            "role": user.role.value,
+        }
+    )
+
+    # -----------------------------------------------------
+    # 8. Create new refresh token
+    # -----------------------------------------------------
+
+    new_refresh_token = create_refresh_token(
+        data={
+            "sub": str(user.id),
+            "role": user.role.value,
+        }
+    )
+
+    # -----------------------------------------------------
+    # 9. Return new tokens
+    # -----------------------------------------------------
+
+    return RefreshTokenResponse(
+        access_token=new_access_token,
+        refresh_token=new_refresh_token,
+        token_type="bearer",
+    )
